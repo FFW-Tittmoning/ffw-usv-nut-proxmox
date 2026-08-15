@@ -3,7 +3,7 @@
 Ein dedizierter Raspberry Pi liest die USV per USB aus und agiert als
 NUT-Server (Network UPS Tools); ein Proxmox-Host ist NUT-Client im selben
 Netzwerksegment und faehrt sich bei Stromausfall rechtzeitig sauber
-herunter. Details/Hintergrund/Entscheidungshistorie: [CLAUDE.md](CLAUDE.md).
+herunter.
 
 ## Aktueller Stand
 
@@ -18,8 +18,7 @@ herunter. Details/Hintergrund/Entscheidungshistorie: [CLAUDE.md](CLAUDE.md).
   auskommentiert, bis der USB-Treiber isoliert getestet ist.
 - **OverlayFS + Boot-Partition read-only:** aktiv. Jede weitere
   Config-Aenderung auf dem Pi braucht deshalb vorher
-  `sudo /root/writable.sh rw` und danach `sudo /root/writable.sh ro`
-  (Details/Hintergrund: CLAUDE.md).
+  `sudo /root/writable.sh rw` und danach `sudo /root/writable.sh ro`.
 - **Wartungs-Scripts auf dem Pi:** `/root/update.sh` (apt-Updates inkl.
   Overlay-Handling) und `/root/writable.sh` (rw/ro-Umschaltung fuer
   manuelle Config-Arbeiten) - beide end-to-end getestet.
