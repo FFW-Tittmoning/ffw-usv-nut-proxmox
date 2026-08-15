@@ -1,0 +1,11 @@
+# Ziel: /etc/nut/upsd.users auf dem Raspberry Pi
+#
+# CHANGE_ME durch ein echtes, generiertes Passwort ersetzen, z.B.:
+#   openssl rand -base64 24
+#
+# Diese Datei ist nur fuer den Server (Pi) selbst relevant; das gleiche
+# Passwort muss in proxmox/upsmon.conf eingetragen werden (MONITOR-Zeile).
+
+[monuser]
+    password = CHANGE_ME
+    upsmon primary
