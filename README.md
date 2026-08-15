@@ -1,58 +1,88 @@
-# APC Smart 2200 -> Proxmox Shutdown via NUT (Raspberry Pi 1 B+)
+# APC Smart-UPS SUA2200I -> Proxmox Shutdown via NUT (Raspberry Pi 1 B+)
 
-Status (2026-08-14): Teil A ist auf dem echten Pi (`USVPI`, PI_IP)
-durchgefuehrt - System aktualisiert, `nut`/`nut-client` installiert, Configs
-liegen unter `/etc/nut/`. `nut-server`/`nut-monitor` sind bewusst **masked**
-(nicht nur disabled - `nut.target` zieht sie sonst trotzdem rein, siehe
-CLAUDE.md), `ups.conf` bleibt komplett auskommentiert. journald/Swap/
-Watchdog sind bereits SD-Karten-schonend konfiguriert (Details CLAUDE.md).
-Hardware (USV-Anschluss, Kabel) ist noch NICHT verifiziert - siehe "Offene
-Punkte" unten. Details zum genauen Deployment-Stand: [CLAUDE.md](CLAUDE.md).
+Ein dedizierter Raspberry Pi liest die USV per USB aus und agiert als
+NUT-Server (Network UPS Tools); ein Proxmox-Host ist NUT-Client im selben
+Netzwerksegment und faehrt sich bei Stromausfall rechtzeitig sauber
+herunter. Details/Hintergrund/Entscheidungshistorie: [CLAUDE.md](CLAUDE.md).
 
-## Offene Punkte (vor Ort, nicht raten)
+## Aktueller Stand
 
-Modell (APC Smart-UPS SUA2200I) und Port-Layout sind per Foto bestaetigt,
-siehe [CLAUDE.md](CLAUDE.md). Entscheidung 2026-08-14: **USB-Weg** ueber
-den `USB`(RJ50)-Port der USV mit einem USB-A-zu-RJ50-Kabel (z.B. Delock
-67016) und Treiber `usbhid-ups` - der Serial-Weg (`apcsmart`) wurde wegen
-einer gefaehrlichen, nicht-standardkonformen Pinbelegung verworfen.
+- **Hardware-Anschluss:** USB-Weg ueber den `USB`(RJ50)-Port der USV mit
+  einem USB-A-zu-RJ50-Kabel (z.B. Delock 67016), Treiber `usbhid-ups`. Der
+  Serial-Weg (`apcsmart`) wurde verworfen (gefaehrliche, nicht-
+  standardkonforme Pinbelegung am Sub-D-Port).
+- **Pi-Grundinstallation:** durchgefuehrt - System aktuell, `nut`/
+  `nut-client` installiert, Configs liegen unter `/etc/nut/`.
+- **`nut-server`/`nut-monitor`:** bewusst **masked** (nicht nur disabled -
+  `nut.target` zieht sie sonst trotzdem rein), `ups.conf` bleibt komplett
+  auskommentiert, bis der USB-Treiber isoliert getestet ist.
+- **OverlayFS + Boot-Partition read-only:** aktiv. Jede weitere
+  Config-Aenderung auf dem Pi braucht deshalb vorher
+  `sudo /root/writable.sh rw` und danach `sudo /root/writable.sh ro`
+  (Details/Hintergrund: CLAUDE.md).
+- **Wartungs-Scripts auf dem Pi:** `/root/update.sh` (apt-Updates inkl.
+  Overlay-Handling) und `/root/writable.sh` (rw/ro-Umschaltung fuer
+  manuelle Config-Arbeiten) - beide end-to-end getestet.
+- **SD-Karten-Schonung:** journald volatile (RAM-only Logs), Swap
+  deaktiviert, Hardware-Watchdog aktiv.
+- **Firewall (`ufw`):** aktiv - SSH erlaubt, NUT-Port (3493/tcp) offen fuer
+  alle (NUT hat eigene Authentifizierung auf Anwendungsebene), sonst
+  eingehend alles geblockt.
+- **Proxmox-Seite:** noch nicht konfiguriert.
+- **IP des Pi:** wird aktuell per DHCP bezogen, noch nicht als feste
+  Reservierung hinterlegt - siehe Offene Punkte.
 
-Noch offen:
+## Offene Punkte / Naechste Schritte
 
-1. Delock-67016-Kabel muss noch bestellt/geliefert werden.
-2. Nach Anschluss: `lsusb` pruefen, dann isolierter `usbhid-ups`-Test
-   (siehe Schritt 5 unten) - Kompatibilitaet ist laut NUT-Doku sehr
-   wahrscheinlich, aber am konkreten Geraet noch nicht verifiziert.
+1. Feste IP fuer den Pi sicherstellen (DHCP-Reservierung im Router
+   bevorzugt, sonst statisch auf dem Pi) - muss vor dem finalen
+   Proxmox-Rollout stehen, sonst kann die Verbindung nach einem
+   Lease-Wechsel brechen.
+2. Delock-67016-Kabel (USB-A -> RJ50) beschaffen und an Pi + USV
+   anschliessen.
+3. `lsusb` pruefen (sollte die USV als USB-Geraet zeigen), danach
+   isolierten `usbhid-ups`-Treibertest durchfuehren (siehe Setup-Schritt
+   5 unten). Kompatibilitaet ist laut NUT-Doku sehr wahrscheinlich, aber
+   am konkreten Geraet noch nicht verifiziert.
+4. Nach erfolgreichem Treibertest: `nut-server`/`nut-monitor` unmasken
+   und aktivieren.
+5. Proxmox-Client konfigurieren (Setup-Teil B unten) und Verbindung
+   verifizieren.
+6. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
+   `ufw`-Regel steht bereits).
+7. Kontrollierter Shutdown-Test (`upsmon -c fsd` auf dem Pi) in einem
+   unkritischen Zeitfenster, Proxmox-Log-Verifikation - nicht ungetestet
+   am Produktivsystem scharf schalten.
 
-## Teil A - jetzt schon sicher machbar (hardwareunabhaengig)
+## Setup-Schritte (Referenz)
 
-### 1. Raspberry Pi OS Lite flashen
+### Teil A - Pi-Grundinstallation
+
+#### 1. Raspberry Pi OS Lite flashen
 
 Mit Raspberry Pi Imager (Advanced Options / Zahnrad vor dem Schreiben):
-- Hostname setzen (z.B. `nut-ups.local`)
+- Hostname setzen
 - SSH aktivieren, eigenen Public Key oder Passwort hinterlegen
 - WLAN NICHT noetig, wenn der Pi per Kabel im selben Segment wie Proxmox
   haengt
 
-### 2. Erstes Update (per SSH auf dem Pi)
+#### 2. Erstes Update (per SSH auf dem Pi)
 
 ```bash
 sudo apt update && sudo apt full-upgrade -y
 sudo reboot
 ```
 
-### 3. NUT installieren (auf dem Pi)
+#### 3. NUT installieren (auf dem Pi)
 
 ```bash
 sudo apt install -y nut nut-client
 ```
 
 Das installiert den Server-Teil (`nut` -> upsd, upsdrvctl) und den
-Client-Teil (`nut-client` -> upsmon). Nach der Installation startet Debian
-normalerweise `nut-monitor`/`upsmon` automatisch mit einer leeren Default-
-Config - das ist unschaedlich, solange `ups.conf` leer/auskommentiert ist.
+Client-Teil (`nut-client` -> upsmon).
 
-### 4. Entwurfs-Configs auf den Pi kopieren
+#### 4. Entwurfs-Configs auf den Pi kopieren
 
 Von diesem Rechner aus (PI_HOST durch echten Hostnamen/IP ersetzen):
 
@@ -77,7 +107,10 @@ Passwort (in beiden Dateien identisch):
 openssl rand -base64 24
 ```
 
-### 5. WICHTIG - noch NICHT aktivieren
+**Hinweis:** Solange OverlayFS aktiv ist, muss vor jeder dieser Aenderungen
+`sudo /root/writable.sh rw` ausgefuehrt werden (danach `... ro`).
+
+#### 5. Treiber isoliert testen - vor dem Aktivieren
 
 `ups.conf` bleibt auskommentiert, solange der Treiber nicht isoliert
 getestet wurde:
@@ -101,13 +134,7 @@ sudo systemctl enable --now nut-server
 sudo systemctl enable --now nut-monitor
 ```
 
-### 6. Firewall (erledigt, Stand 2026-08-14)
-
-`ufw` ist installiert und aktiv. SSH zuerst erlaubt (Absicherung gegen
-Aussperren), NUT-Port bewusst offen fuer alle (nicht auf die Proxmox-IP
-beschraenkt - Entscheidung des Nutzers, NUT hat eigene
-Benutzer/Passwort-Authentifizierung auf Anwendungsebene). Alles andere
-eingehend geblockt:
+#### 6. Firewall
 
 ```bash
 sudo ufw default deny incoming
@@ -121,10 +148,10 @@ Nach dem Enable **immer mit einer neuen SSH-Verbindung verifizieren**
 (nicht nur die bestehende Session pruefen), dass der Zugriff noch
 funktioniert. Status pruefen: `sudo ufw status verbose`.
 
-## Teil B - Proxmox-Seite (Client)
+### Teil B - Proxmox-Seite (Client)
 
 Erst konfigurieren, nachdem `upsc apc2200@PI_IP` vom Pi aus lokal
-funktioniert (Schritt 2 des Gesamtplans) und Port 3493 erreichbar ist.
+funktioniert und Port 3493 erreichbar ist.
 
 ```bash
 apt install -y nut-client
@@ -138,11 +165,3 @@ upsc apc2200@PI_IP
 ```
 
 von Proxmox aus verifizieren, bevor `nut-client` (neu)gestartet wird.
-
-## Danach (siehe Gesamtplan, hier nicht enthalten)
-
-- End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
-  `ufw`-Regel ist bereits gesetzt, siehe Schritt 6 oben)
-- Kontrollierter Shutdown-Test (`upsmon -c fsd` auf dem Pi) in einem
-  unkritischen Zeitfenster, Proxmox-Log-Verifikation
-- Overlay-/Read-only-Root auf dem Pi erst NACH bestaetigter Grundfunktion
