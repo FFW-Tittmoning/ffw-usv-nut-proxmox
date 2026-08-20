@@ -16,9 +16,10 @@ herunter.
 - **`nut-server`/`nut-monitor`:** bewusst **masked** (nicht nur disabled -
   `nut.target` zieht sie sonst trotzdem rein), `ups.conf` bleibt komplett
   auskommentiert, bis der USB-Treiber isoliert getestet ist.
-- **OverlayFS + Boot-Partition read-only:** aktiv. Jede weitere
-  Config-Aenderung auf dem Pi braucht deshalb vorher
-  `sudo /root/writable.sh rw` und danach `sudo /root/writable.sh ro`.
+- **OverlayFS + Boot-Partition read-only:** Mechanismus aktiv, System
+  steht aktuell bewusst auf `rw` (fuer laufende Config-Arbeiten). Jede
+  Config-Aenderung braucht `sudo /root/writable.sh rw` vorher und
+  `sudo /root/writable.sh ro` danach, sobald wieder abgeschlossen.
 - **Wartungs-Scripts auf dem Pi:** `/root/update.sh` (apt-Updates inkl.
   Overlay-Handling) und `/root/writable.sh` (rw/ro-Umschaltung fuer
   manuelle Config-Arbeiten) - beide end-to-end getestet.
@@ -28,28 +29,26 @@ herunter.
   alle (NUT hat eigene Authentifizierung auf Anwendungsebene), sonst
   eingehend alles geblockt.
 - **Proxmox-Seite:** noch nicht konfiguriert.
-- **IP des Pi:** wird aktuell per DHCP bezogen, noch nicht als feste
-  Reservierung hinterlegt - siehe Offene Punkte.
+- **Netzwerk:** Pi ist am finalen Standort (direkt bei der USV) im
+  Ziel-Netzwerk. IP ist sowohl per DHCP-Reservierung (Router) als auch
+  zusaetzlich statisch auf dem Pi (NetworkManager) fixiert - persistiert
+  ueber Reboots.
+- **USB-Verbindung zur USV:** Kabel angeschlossen, `lsusb` erkennt die
+  USV bereits als USB-Geraet (APC, Vendor-ID `051d`).
 
 ## Offene Punkte / Naechste Schritte
 
-1. Feste IP fuer den Pi sicherstellen (DHCP-Reservierung im Router
-   bevorzugt, sonst statisch auf dem Pi) - muss vor dem finalen
-   Proxmox-Rollout stehen, sonst kann die Verbindung nach einem
-   Lease-Wechsel brechen.
-2. Delock-67016-Kabel (USB-A -> RJ50) beschaffen und an Pi + USV
-   anschliessen.
-3. `lsusb` pruefen (sollte die USV als USB-Geraet zeigen), danach
-   isolierten `usbhid-ups`-Treibertest durchfuehren (siehe Setup-Schritt
-   5 unten). Kompatibilitaet ist laut NUT-Doku sehr wahrscheinlich, aber
+1. Isolierten `usbhid-ups`-Treibertest durchfuehren (siehe Setup-Schritt
+   5 unten) - Kompatibilitaet ist laut NUT-Doku sehr wahrscheinlich, aber
    am konkreten Geraet noch nicht verifiziert.
-4. Nach erfolgreichem Treibertest: `nut-server`/`nut-monitor` unmasken
-   und aktivieren.
-5. Proxmox-Client konfigurieren (Setup-Teil B unten) und Verbindung
+2. Nach erfolgreichem Treibertest: `nut-server`/`nut-monitor` unmasken
+   und aktivieren, danach System wieder mit `sudo /root/writable.sh ro`
+   read-only setzen.
+3. Proxmox-Client konfigurieren (Setup-Teil B unten) und Verbindung
    verifizieren.
-6. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
+4. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
    `ufw`-Regel steht bereits).
-7. Kontrollierter Shutdown-Test (`upsmon -c fsd` auf dem Pi) in einem
+5. Kontrollierter Shutdown-Test (`upsmon -c fsd` auf dem Pi) in einem
    unkritischen Zeitfenster, Proxmox-Log-Verifikation - nicht ungetestet
    am Produktivsystem scharf schalten.
 
