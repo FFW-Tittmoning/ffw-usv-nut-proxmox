@@ -15,6 +15,10 @@ herunter.
   `nut-client` installiert, Configs liegen unter `/etc/nut/`.
 - **`nut-server`:** aktiv, `ups.conf` scharf (`usbhid-ups`-Treiber). Per
   `upsc` verifiziert - liefert echte Werte (Batterie, Spannungen, Status).
+- **Shutdown-Schwelle:** `override.battery.charge.low = 30` in `ups.conf`
+  gesetzt (Werks-Default der USV war 10%, fuer Server-/VM-Workloads zu
+  knapp) - rein softwareseitiger Treiber-Override, kein Schreibzugriff
+  auf die USV. Begruendung/Kriterien: [proxmox/SETUP.md](proxmox/SETUP.md).
 - **`nut-monitor`:** bleibt **dauerhaft masked** - bewusste
   Architektur-Entscheidung: Der Pi soll niemals selbst herunterfahren
   (OverlayFS schuetzt die SD-Karte auch bei hartem Stromausfall) und
@@ -34,7 +38,8 @@ herunter.
 - **Firewall (`ufw`):** aktiv - SSH erlaubt, NUT-Port (3493/tcp) offen fuer
   alle (NUT hat eigene Authentifizierung auf Anwendungsebene), sonst
   eingehend alles geblockt.
-- **Proxmox-Seite:** noch nicht konfiguriert.
+- **Proxmox-Seite:** noch nicht konfiguriert - Anleitung dafuer liegt
+  bereit unter [proxmox/SETUP.md](proxmox/SETUP.md).
 - **Netzwerk:** Pi ist am finalen Standort (direkt bei der USV) im
   Ziel-Netzwerk. IP ist sowohl per DHCP-Reservierung (Router) als auch
   zusaetzlich statisch auf dem Pi (NetworkManager) fixiert - persistiert
@@ -46,15 +51,12 @@ herunter.
 
 1. **Ungeklaerte Auffaelligkeit:** `ups.load`/`output.current` zeigen
    durchgehend 0, obwohl laut Betreiber mehrere Rechner + der
-   Proxmox-Server an der USV haengen sollen - vor Ort pruefen (haengen
-   die Geraete wirklich an dieser USV / sind sie gerade aktiv?).
-2. System wieder mit `sudo /root/writable.sh ro` read-only setzen, sobald
-   die laufenden Config-Arbeiten abgeschlossen sind.
-3. Proxmox-Client konfigurieren (Setup-Teil B unten) und Verbindung
-   verifizieren.
-4. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
+   Proxmox-Server sicher an dieser USV haengen (bestaetigt) - Ursache noch
+   ungeklaert, weiter zu untersuchen.
+2. Proxmox-Client konfigurieren: [proxmox/SETUP.md](proxmox/SETUP.md).
+3. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
    `ufw`-Regel steht bereits).
-5. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
+4. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
    `upsmon` im `secondary`-Modus und trifft die Shutdown-Entscheidung -
    der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
    unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
