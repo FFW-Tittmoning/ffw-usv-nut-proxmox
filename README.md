@@ -51,12 +51,20 @@ herunter.
 
 1. **Ungeklaerte Auffaelligkeit:** `ups.load`/`output.current` zeigen
    durchgehend 0, obwohl laut Betreiber mehrere Rechner + der
-   Proxmox-Server sicher an dieser USV haengen (bestaetigt) - Ursache noch
-   ungeklaert, weiter zu untersuchen.
+   Proxmox-Server sicher an dieser USV haengen (bestaetigt). Die
+   HID-Beschreibung des Geraets hat nur einen einzigen, ungeteilten
+   Ausgangskreis (keine separaten Outlet-Gruppen wie bei manchen
+   Rack-Modellen) - ein "anderer, nicht ueberwachter Ausgangskreis" scheidet
+   damit als Erklaerung aus. Verbleibend: entweder haengen die Geraete
+   physisch nicht wirklich an dieser USV (z.B. vorgeschaltete Steckerleiste
+   pruefen), oder der Sensor der USV meldet fehlerhaft - vor Ort mit
+   Verkabelung/ggf. Ersatzmessung zu klaeren.
 2. Proxmox-Client konfigurieren: [proxmox/SETUP.md](proxmox/SETUP.md).
-3. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
+3. Windows-Clients konfigurieren (falls gewuenscht):
+   [windows/SETUP.md](windows/SETUP.md).
+4. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
    `ufw`-Regel steht bereits).
-4. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
+5. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
    `upsmon` im `secondary`-Modus und trifft die Shutdown-Entscheidung -
    der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
    unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
