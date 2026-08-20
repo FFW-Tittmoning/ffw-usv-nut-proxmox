@@ -13,13 +13,19 @@ herunter.
   standardkonforme Pinbelegung am Sub-D-Port).
 - **Pi-Grundinstallation:** durchgefuehrt - System aktuell, `nut`/
   `nut-client` installiert, Configs liegen unter `/etc/nut/`.
-- **`nut-server`/`nut-monitor`:** bewusst **masked** (nicht nur disabled -
-  `nut.target` zieht sie sonst trotzdem rein), `ups.conf` bleibt komplett
-  auskommentiert, bis der USB-Treiber isoliert getestet ist.
+- **`nut-server`:** aktiv, `ups.conf` scharf (`usbhid-ups`-Treiber). Per
+  `upsc` verifiziert - liefert echte Werte (Batterie, Spannungen, Status).
+- **`nut-monitor`:** bleibt **dauerhaft masked** - bewusste
+  Architektur-Entscheidung: Der Pi soll niemals selbst herunterfahren
+  (OverlayFS schuetzt die SD-Karte auch bei hartem Stromausfall) und
+  dadurch garantiert bis zuletzt Daten liefern. Die Shutdown-Entscheidung
+  liegt komplett bei Proxmox (dessen `upsmon` im `secondary`-Modus wertet
+  die Werte selbst aus).
 - **OverlayFS + Boot-Partition read-only:** Mechanismus aktiv, System
-  steht aktuell bewusst auf `rw` (fuer laufende Config-Arbeiten). Jede
-  Config-Aenderung braucht `sudo /root/writable.sh rw` vorher und
-  `sudo /root/writable.sh ro` danach, sobald wieder abgeschlossen.
+  steht aktuell bewusst auf `rw` (fuer laufende Config-Arbeiten, noch
+  nicht wieder auf `ro` gesetzt). Jede Config-Aenderung braucht
+  `sudo /root/writable.sh rw` vorher und `sudo /root/writable.sh ro`
+  danach, sobald abgeschlossen.
 - **Wartungs-Scripts auf dem Pi:** `/root/update.sh` (apt-Updates inkl.
   Overlay-Handling) und `/root/writable.sh` (rw/ro-Umschaltung fuer
   manuelle Config-Arbeiten) - beide end-to-end getestet.
@@ -38,19 +44,21 @@ herunter.
 
 ## Offene Punkte / Naechste Schritte
 
-1. Isolierten `usbhid-ups`-Treibertest durchfuehren (siehe Setup-Schritt
-   5 unten) - Kompatibilitaet ist laut NUT-Doku sehr wahrscheinlich, aber
-   am konkreten Geraet noch nicht verifiziert.
-2. Nach erfolgreichem Treibertest: `nut-server`/`nut-monitor` unmasken
-   und aktivieren, danach System wieder mit `sudo /root/writable.sh ro`
-   read-only setzen.
+1. **Ungeklaerte Auffaelligkeit:** `ups.load`/`output.current` zeigen
+   durchgehend 0, obwohl laut Betreiber mehrere Rechner + der
+   Proxmox-Server an der USV haengen sollen - vor Ort pruefen (haengen
+   die Geraete wirklich an dieser USV / sind sie gerade aktiv?).
+2. System wieder mit `sudo /root/writable.sh ro` read-only setzen, sobald
+   die laufenden Config-Arbeiten abgeschlossen sind.
 3. Proxmox-Client konfigurieren (Setup-Teil B unten) und Verbindung
    verifizieren.
 4. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
    `ufw`-Regel steht bereits).
-5. Kontrollierter Shutdown-Test (`upsmon -c fsd` auf dem Pi) in einem
-   unkritischen Zeitfenster, Proxmox-Log-Verifikation - nicht ungetestet
-   am Produktivsystem scharf schalten.
+5. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
+   `upsmon` im `secondary`-Modus und trifft die Shutdown-Entscheidung -
+   der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
+   unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
+   Produktivsystem scharf schalten.
 
 ## Setup-Schritte (Referenz)
 
@@ -124,13 +132,19 @@ upsc apc2200@localhost
 ```
 
 Erst wenn hier reale Werte (Ladezustand, Status, Spannung) ankommen,
-Dienste (neu) starten:
+`nut-server` (neu) starten - **`nut-monitor` bleibt bewusst dauerhaft
+masked**, siehe "Aktueller Stand" oben (der Pi soll nie selbst
+herunterfahren, das erledigt Proxmox):
 
 ```bash
-sudo systemctl unmask nut-server nut-monitor
+sudo systemctl unmask nut-server
 sudo systemctl enable --now nut-server
-sudo systemctl enable --now nut-monitor
 ```
+
+**Wichtig nach einem Standortwechsel:** `upsd.conf`s `LISTEN`-Zeile muss
+auf die tatsaechliche, aktuelle IP des Pi zeigen - eine dort noch
+eingetragene alte IP fuehrt zu einer Crash-Loop von `nut-server`
+("no listening interface available").
 
 #### 6. Firewall
 
