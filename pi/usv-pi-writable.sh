@@ -123,13 +123,13 @@ cmd_ro() {
       # aktiv ist, landet JEDE Aenderung daran nur im fluechtigen
       # tmpfs-Upper-Layer und ist nach dem naechsten Reboot wieder weg -
       # ein frueherer manueller sed-Workaround hier ist genau daran
-      # gescheitert (verifiziert 2026-08-15, siehe CLAUDE.md). Deshalb:
-      # kein Versuch eines Live-Fixes, sondern sauber ueber 'rw' fuehren,
-      # das per Reboot echten (nicht ueberlagerten) Zugriff auf die
-      # Root-Partition herstellt.
+      # gescheitert (verifiziert 2026-08-15). Deshalb: kein Versuch eines
+      # Live-Fixes, sondern sauber ueber 'rw' fuehren, das per Reboot
+      # echten (nicht ueberlagerten) Zugriff auf die Root-Partition
+      # herstellt.
       echo "Boot-Partition ist noch nicht read-only, OverlayFS aber schon aktiv." >&2
       echo "Eine Aenderung an /etc/fstab waere in diesem Zustand NICHT dauerhaft" >&2
-      echo "(landet nur im RAM-Overlay, siehe CLAUDE.md). Bitte zuerst:" >&2
+      echo "(landet nur im RAM-Overlay). Bitte zuerst:" >&2
       echo "  sudo $0 rw" >&2
       echo "damit noetigen Reboot durchfuehren, Boot-RO dort setzen, dann" >&2
       echo "erneut 'sudo $0 ro' ausfuehren." >&2

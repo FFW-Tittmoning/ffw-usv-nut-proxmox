@@ -6,8 +6,7 @@ wann es sich selbst herunterfaehrt. Der Pi selbst hat bewusst **keine**
 eigene Shutdown-Logik (`nut-monitor` bleibt dort dauerhaft masked) - er
 soll auch bei stark entladener Batterie einfach weiter Daten liefern, bis
 er hart die Spannung verliert (das schadet dank OverlayFS/Boot-Partition
-read-only nicht der SD-Karte). Details/Hintergrund dazu: siehe `CLAUDE.md`
-im Projekt (lokal, nicht im Repo).
+read-only nicht der SD-Karte).
 
 ## Funktionsprinzip (kurz)
 
@@ -31,7 +30,7 @@ Standort auf **30%** gesetzt (Begruendung: Werks-Default der USV ist 10%,
 zu knapp fuer einen Host mit mehreren VMs - siehe "Wahl der Schwelle"
 unten).
 
-## Voraussetzung (bereits erledigt, siehe Pi-seitiges Repo/CLAUDE.md)
+## Voraussetzung (bereits erledigt auf dem Pi)
 
 - `nut-server` auf dem Pi aktiv, `ups.conf` mit `override.battery.charge.low`
   auf den gewuenschten Wert gesetzt und verifiziert (`upsc <ups>@<PI_IP>`
