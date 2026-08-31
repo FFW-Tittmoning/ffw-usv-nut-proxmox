@@ -1,5 +1,7 @@
 # APC Smart-UPS SUA2200I -> Proxmox Shutdown via NUT (Raspberry Pi 1 B+)
 
+![Built with AI](https://img.shields.io/badge/Built_with-AI-success)
+
 Ein dedizierter Raspberry Pi liest die USV per USB aus und agiert als
 NUT-Server (Network UPS Tools); ein Proxmox-Host ist NUT-Client im selben
 Netzwerksegment und faehrt sich bei Stromausfall rechtzeitig sauber
