@@ -69,9 +69,9 @@ herunter.
    der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
    unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
    Produktivsystem scharf schalten.
-6. Alarmierung bei Netzausfall einrichten (Sofort-Push + optional Uptime
-   Kuma fuer generelle Umgebungsueberwachung):
-   [monitoring/SETUP.md](monitoring/SETUP.md).
+6. Alarmierung bei Netzausfall/kritischem Akkustand ueber Uptime Kuma
+   einrichten (periodischer Heartbeat + ereignisgetriebener Sofort-Push
+   in denselben Monitor): [monitoring/SETUP.md](monitoring/SETUP.md).
 
 ## Setup-Schritte (Referenz)
 

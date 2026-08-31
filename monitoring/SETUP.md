@@ -1,169 +1,104 @@
-# Alarmierung bei Netzausfall + Uptime Kuma Integration
+# Alarmierung bei Netzausfall + kritischem Akkustand ueber Uptime Kuma
 
-Generische Anleitung, unabhaengig vom konkreten Standort. Zwei Ebenen, die
-sich ergaenzen:
+Generische Anleitung, unabhaengig vom konkreten Standort. **Uptime Kuma
+ist die alleinige Benachrichtigungsquelle** (Push/E-Mail/Telegram/... -
+konfiguriert in Kuma selbst). Damit Kuma sowohl sofort reagiert als auch
+keine Fehlalarme durch Timeouts produziert, laufen zwei sich ergaenzende
+Signalwege in **denselben Push-Monitor**:
 
-1. **Sofort-Alarm** (Sekunden-Reaktionszeit): NUT ruft bei Statuswechsel
-   direkt einen Push-Dienst auf - funktioniert unabhaengig von allem
-   anderen, auch ohne Uptime Kuma.
-2. **Uptime Kuma** als zusaetzliche VM/LXC auf Proxmox: Dashboard +
-   Verlauf + Verteilung auf mehrere Kanaele (Push, E-Mail, Telegram, ...)
-   fuer die generelle Umgebungsueberwachung, inkl. der USV als einem von
-   mehreren ueberwachten Punkten.
+1. **Periodischer Heartbeat per Cron** (bereits eingerichtet und laeuft) -
+   haelt den Kuma-Monitor "am Leben" und liefert den Normalzustand.
+2. **Ereignisgetriebener Sofort-Push per NUT `NOTIFYCMD`** (neu, dieser
+   Abschnitt) - meldet Netzausfall und kritischen Akkustand **sofort**,
+   ohne auf den naechsten Cron-Takt zu warten.
 
 **Hinweis:** Nicht an einem echten System gegengetestet (kein Zugriff auf
 die Proxmox-Umgebung). Die NUT-Doku-Fakten (`NOTIFYCMD`/`NOTIFYFLAG`-Syntax)
-sind gegen `upsmon.conf(5)` verifiziert, restliche Schritte (Kuma-UI,
-Community-Scripts) bitte beim Umsetzen selbst pruefen.
+sind gegen `upsmon.conf(5)` verifiziert, Kuma-UI-Details bitte beim
+Umsetzen selbst pruefen.
 
-## Ebene 1: Sofort-Alarm per Push (NUT -> ntfy.sh)
+## Warum beide Signalwege noetig sind
 
-Laeuft auf dem System, das `upsmon` im `secondary`-Modus faehrt (Proxmox,
-siehe `proxmox/SETUP.md`). Nutzt NUTs eingebauten Notify-Mechanismus.
+Ein Kuma-**Push**-Monitor erwartet ein periodisches Signal - bleibt es
+laenger als das konfigurierte Intervall aus, wertet Kuma das als "down"
+(Timeout), unabhaengig vom tatsaechlichen USV-Status. Ein rein
+ereignisgetriebener Push (nur bei Aenderungen) wuerde deshalb nach Wochen
+ohne Netzausfall selbst einen Fehlalarm ausloesen ("kein Heartbeat mehr
+angekommen"). Deshalb bleibt der Cron-Heartbeat als Basis bestehen - der
+`NOTIFYCMD`-Hook ergaenzt ihn nur um sofortige Reaktion GENAU in dem
+Moment, in dem sich der Status aendert, statt bis zu 2 Minuten (Cron-Takt)
+darauf zu warten.
+
+## Voraussetzung (bereits erledigt)
+
+- Kuma-Push-Monitor fuer die USV angelegt, Push-URL bekannt:
+  ```
+  http://<kuma-ip>:3001/api/push/<token>
+  ```
+- Periodisches Heartbeat-Skript per Cron laeuft bereits (alle 2 Minuten,
+  meldet aktuellen Normalzustand).
+- Notification-Kanaele (Push/E-Mail/...) in Kuma selbst eingerichtet
+  (`Settings -> Notifications`) und dem Monitor zugewiesen.
+
+## Sofort-Push bei Netzausfall + kritischem Akkustand einrichten
 
 ### Notify-Script anlegen
 
 ```bash
-# /usr/local/bin/nut-notify.sh
+# /usr/local/bin/nut-kuma-notify.sh
 #!/bin/bash
-MSG="$*"
-TOPIC="https://ntfy.sh/<dein-eindeutiges-topic>"   # selbst waehlen, z.B. ffw-tittmoning-usv-xyz123
+KUMA_URL="http://<kuma-ip>:3001/api/push/<token>"   # identisch zur Cron-URL
 
 case "$NOTIFYTYPE" in
   ONBATT)
-    curl -s -H "Title: USV-Alarm: Netzausfall" -H "Priority: urgent" -H "Tags: warning" \
-      -d "Netzausfall am Standort - USV laeuft auf Batterie. $MSG" "$TOPIC"
-    ;;
-  ONLINE)
-    curl -s -H "Title: USV: Netz wieder da" -H "Tags: white_check_mark" \
-      -d "Netzversorgung wiederhergestellt. $MSG" "$TOPIC"
+    curl -s "${KUMA_URL}?status=down&msg=Netzausfall%20-%20USV%20auf%20Batterie&ping=" >/dev/null
     ;;
   LOWBATT)
-    curl -s -H "Title: USV-Alarm: Akku kritisch" -H "Priority: urgent" -H "Tags: rotating_light" \
-      -d "Akku unter Schwelle, Shutdown steht bevor. $MSG" "$TOPIC"
+    curl -s "${KUMA_URL}?status=down&msg=KRITISCH%3A%20Akkustand%20niedrig%2C%20Shutdown%20bevorstehend&ping=" >/dev/null
+    ;;
+  ONLINE)
+    curl -s "${KUMA_URL}?status=up&msg=Netzversorgung%20wiederhergestellt&ping=" >/dev/null
     ;;
 esac
 ```
 
 ```bash
-chmod +x /usr/local/bin/nut-notify.sh
+chmod +x /usr/local/bin/nut-kuma-notify.sh
 ```
 
-### In upsmon.conf einbinden
+`LOWBATT` und `ONBATT` senden beide `status=down` (Kuma kennt nur
+up/down), unterscheiden sich aber in der `msg` - dadurch zeigt die
+Kuma-Benachrichtigung trotzdem den richtigen Grund an ("Netzausfall" vs.
+"kritischer Akkustand").
+
+### In upsmon.conf einbinden (auf Proxmox)
 
 ```
-NOTIFYCMD /usr/local/bin/nut-notify.sh
+NOTIFYCMD /usr/local/bin/nut-kuma-notify.sh
 NOTIFYFLAG ONBATT SYSLOG+WALL+EXEC
-NOTIFYFLAG ONLINE SYSLOG+WALL+EXEC
 NOTIFYFLAG LOWBATT SYSLOG+WALL+EXEC
+NOTIFYFLAG ONLINE SYSLOG+WALL+EXEC
 ```
 
 Wichtig laut Doku (`upsmon.conf(5)`): `NOTIFYCMD` wird nur fuer Events
-aufgerufen, die `EXEC` in ihrem `NOTIFYFLAG` gesetzt haben - ohne das
-passiert nichts. `$NOTIFYTYPE` (Umgebungsvariable) und die Nachricht als
-Parameter (`$*`) stehen im Script wie oben gezeigt zur Verfuegung.
+aufgerufen, die `EXEC` in ihrem `NOTIFYFLAG` gesetzt haben. Die
+Umgebungsvariable `$NOTIFYTYPE` steht im Script wie oben gezeigt zur
+Verfuegung.
 
-### Handy einrichten
-
-App **ntfy** installieren (iOS/Android), das gewaehlte Topic abonnieren -
-fertig, keine Account-Registrierung noetig. Alternativ selbst gehostete
-ntfy-Instanz oder Pushover/Gotify verwenden (gleiches Prinzip, andere URL).
-
-### E-Mail-Fallback (optional, zusaetzlich im selben Script)
-
+`upsmon` neu laden/starten, damit die Config-Aenderung greift:
 ```bash
-echo "$MSG" | mailx -s "USV-Alarm: $NOTIFYTYPE" empfaenger@example.com
+systemctl restart nut-monitor   # ggf. anderen Dienstnamen einsetzen, siehe proxmox/SETUP.md
 ```
-
-Setzt ein konfiguriertes MTA voraus (z.B. `msmtp`).
-
-## Ebene 2: Uptime Kuma auf Proxmox
-
-### Bereitstellung
-
-**Option A - manuell (offizielles Docker-Image, volle Kontrolle):**
-
-1. Kleinen Debian/Ubuntu-LXC anlegen (1 vCPU, 512MB-1GB RAM, 8GB Disk
-   reichen locker).
-2. Docker im Container installieren.
-3. Uptime Kuma starten:
-   ```bash
-   docker run -d --restart=unless-stopped -p 3001:3001 \
-     -v uptime-kuma:/app/data --name uptime-kuma louislam/uptime-kuma:1
-   ```
-4. Web-UI unter `http://<kuma-ip>:3001` aufrufen, Admin-Account anlegen.
-
-**Option B - Proxmox Community-Scripts (schneller, fertiges LXC-Skript):**
-
-Die Proxmox VE Community-Scripts (`community-scripts.github.io`) bieten
-einen fertigen Uptime-Kuma-LXC-Installer per Einzeiler. **Vor Ausfuehrung
-das Skript selbst anschauen** (es laeuft mit Root-Rechten auf dem
-Proxmox-Host) - wie bei jedem Skript aus dem Internet, das man mit
-erhoehten Rechten ausfuehrt.
-
-### Notification-Kanaele in Kuma einrichten
-
-`Settings -> Notifications -> Add Notification`:
-- Push (ntfy/Pushover/Gotify - gleiches Topic wie oben nutzbar oder
-  separates)
-- Email (SMTP) als Fallback
-
-### Push-Monitor fuer die USV anlegen
-
-`Add New Monitor -> Monitor Type: Push`. Kuma generiert eine eindeutige
-Push-URL nach dem Muster:
-```
-http://<kuma-ip>:3001/api/push/<token>?status=up&msg=OK&ping=
-```
-
-**Wichtig:** Ein Push-Monitor in Kuma erwartet ein **periodisches**
-Signal (Heartbeat) - nicht nur bei Aenderungen. Bleibt das Netz wochenlang
-stabil und es kommt nie ein Push, wertet Kuma das nach Ablauf des
-konfigurierten Intervalls als "down" (Fehlalarm). Deshalb hier bewusst
-**nicht** den ereignisgetriebenen `NOTIFYCMD`-Hook direkt wiederverwenden,
-sondern ein periodisches Skript per Cron, das den aktuellen Stand aktiv
-abfragt und meldet:
-
-```bash
-# /usr/local/bin/kuma-ups-heartbeat.sh
-#!/bin/bash
-UPS="apc2200@<PI_IP>"
-KUMA_URL="http://<kuma-ip>:3001/api/push/<token>"
-
-if upsc "$UPS" ups.status 2>/dev/null | grep -q "OB"; then
-  curl -s "${KUMA_URL}?status=down&msg=USV+auf+Batterie&ping=" >/dev/null
-else
-  curl -s "${KUMA_URL}?status=up&msg=OK&ping=" >/dev/null
-fi
-```
-
-```bash
-chmod +x /usr/local/bin/kuma-ups-heartbeat.sh
-crontab -e
-# Zeile ergaenzen (alle 2 Minuten):
-*/2 * * * * /usr/local/bin/kuma-ups-heartbeat.sh
-```
-
-Heartbeat-Intervall in Kuma passend zum Cron-Takt einstellen (z.B. auf
-3-5 Minuten, etwas grosszuegiger als die Cron-Frequenz, um keine
-Fehlalarme durch Timing-Jitter zu bekommen).
-
-### Warum beide Ebenen sinnvoll sind
-
-- **Ebene 1** (direkter `NOTIFYCMD`-Hook): reagiert in Sekunden, unabhaengig
-  davon, ob Kuma laeuft/erreichbar ist.
-- **Ebene 2** (Kuma-Heartbeat): etwas traegere Reaktionszeit (durch den
-  Cron-Takt bestimmt, z.B. bis zu 2-5 Minuten), dafuer Dashboard,
-  Verlaufs-Historie und ein zweiter, unabhaengiger Alarmweg als
-  Rueckfallebene - falls z.B. der ntfy-Dienst selbst mal nicht erreichbar
-  ist, meldet Kuma trotzdem.
 
 ## Test
 
-1. Ebene 1 isoliert testen: `NOTIFYTYPE=ONBATT /usr/local/bin/nut-notify.sh "Testnachricht"`
-   manuell ausfuehren - kommt die Push-Nachricht an?
-2. Heartbeat-Skript isoliert testen: `/usr/local/bin/kuma-ups-heartbeat.sh`
-   manuell ausfuehren, Kuma-Dashboard pruefen (sollte "up" zeigen).
+1. Script isoliert testen (ohne echten Ereignisauslauf):
+   ```bash
+   NOTIFYTYPE=ONBATT /usr/local/bin/nut-kuma-notify.sh
+   ```
+   Kuma-Dashboard pruefen: Monitor sollte sofort auf "down" springen,
+   konfigurierte Benachrichtigung sollte ausgeloest werden.
+2. Danach mit `NOTIFYTYPE=LOWBATT` und `NOTIFYTYPE=ONLINE` wiederholen.
 3. Erst danach im Rahmen des ohnehin geplanten kontrollierten Shutdown-Tests
-   (`proxmox/SETUP.md`, Abschnitt "Kontrollierter Test") mitpruefen, ob
-   beide Alarme bei simuliertem `upsmon -c fsd` tatsaechlich ausloesen.
+   (`proxmox/SETUP.md`, Abschnitt "Kontrollierter Test") mitpruefen, ob der
+   Alarm bei echtem simuliertem `upsmon -c fsd` ebenfalls ausloest.
