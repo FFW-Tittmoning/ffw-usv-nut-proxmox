@@ -6,10 +6,9 @@ USV-Werte vom Pi (NUT-Server) und entscheidet **eigenstaendig**, wann er
 sich herunterfaehrt. Zusaetzlich: sichtbare Warnung auf dem Bildschirm,
 bevor es tatsaechlich passiert.
 
-**Hinweis:** Diese Anleitung wurde nicht an einem echten Windows-PC
-gegengetestet (kein Zugriff darauf). Protokoll-Fakten (Port, Zugangsdaten,
-Funktionsprinzip) sind sicher, UI-Details bitte beim Einrichten selbst
-verifizieren.
+**Hinweis:** Diese Anleitung ist nicht an einem echten Windows-PC
+gegengetestet. Protokoll-Fakten (Port, Zugangsdaten, Funktionsprinzip)
+sind sicher, UI-Details bitte beim Einrichten selbst verifizieren.
 
 ## Empfohlenes Tool: WinNUT-Client
 
@@ -25,7 +24,7 @@ Es laeuft als Tray-Anwendung/Dienst, verbindet sich zu einem NUT-Server
 Low-Battery, Kommunikationsverlust) und kann bei Bedarf einen sauberen
 Windows-Shutdown ausloesen.
 
-## Voraussetzung (bereits erledigt auf dem Pi)
+## Voraussetzungen (auf dem Pi)
 
 - `nut-server` auf dem Pi aktiv, `ups.conf` mit
   `override.battery.charge.low` auf den gewuenschten Wert gesetzt.

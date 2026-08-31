@@ -9,7 +9,7 @@ herunter.
 
 - **Hardware-Anschluss:** USB-Weg ueber den `USB`(RJ50)-Port der USV mit
   einem USB-A-zu-RJ50-Kabel (z.B. Delock 67016), Treiber `usbhid-ups`. Der
-  Serial-Weg (`apcsmart`) wurde verworfen (gefaehrliche, nicht-
+  Serial-Weg (`apcsmart`) wird nicht genutzt (gefaehrliche, nicht-
   standardkonforme Pinbelegung am Sub-D-Port).
 - **Pi-Grundinstallation:** durchgefuehrt - System aktuell, `nut`/
   `nut-client` installiert, Configs liegen unter `/etc/nut/`.
@@ -19,7 +19,7 @@ herunter.
   gesetzt (Werks-Default der USV war 10%, fuer Server-/VM-Workloads zu
   knapp) - rein softwareseitiger Treiber-Override, kein Schreibzugriff
   auf die USV. Begruendung/Kriterien: [proxmox/SETUP.md](proxmox/SETUP.md).
-- **`nut-monitor` auf dem Pi:** laeuft inzwischen (Rolle `secondary`,
+- **`nut-monitor` auf dem Pi:** laeuft (Rolle `secondary`,
   `SHUTDOWNCMD` auf `/bin/true` neutralisiert) - aber **ausschliesslich**
   fuer eine lokale Uptime-Kuma-Benachrichtigung
   ([monitoring/SETUP.md](monitoring/SETUP.md)), NICHT fuer eine
@@ -41,14 +41,22 @@ herunter.
 - **Firewall (`ufw`):** aktiv - SSH erlaubt, NUT-Port (3493/tcp) offen fuer
   alle (NUT hat eigene Authentifizierung auf Anwendungsebene), sonst
   eingehend alles geblockt.
-- **Proxmox-Seite:** noch nicht konfiguriert - Anleitung dafuer liegt
-  bereit unter [proxmox/SETUP.md](proxmox/SETUP.md).
+- **Proxmox-Seite:** konfiguriert (`nut-client`, `upsmon` im
+  `secondary`-Modus, liest die USV-Werte vom Pi). Anleitung/Hintergrund:
+  [proxmox/SETUP.md](proxmox/SETUP.md).
 - **Netzwerk:** Pi ist am finalen Standort (direkt bei der USV) im
   Ziel-Netzwerk. IP ist sowohl per DHCP-Reservierung (Router) als auch
   zusaetzlich statisch auf dem Pi (NetworkManager) fixiert - persistiert
   ueber Reboots.
 - **USB-Verbindung zur USV:** Kabel angeschlossen, `lsusb` erkennt die
   USV bereits als USB-Geraet (APC, Vendor-ID `051d`).
+- **Alarmierung bei Netzausfall:** periodischer Heartbeat + ereignis-
+  getriebener Sofort-Push, beide auf dem Pi selbst (keine Abhaengigkeit
+  von Proxmox fuer die Benachrichtigung), in einen Uptime-Kuma-Monitor.
+  Bekannte Einschraenkung: kritischer Akkustand (`LOWBATT`) loest keine
+  eigene Benachrichtigung aus, da Kuma nur bei echtem Statuswechsel
+  (up/down) alarmiert und der Monitor durch den vorherigen Netzausfall
+  bereits "down" ist. Details: [monitoring/SETUP.md](monitoring/SETUP.md).
 
 ## Offene Punkte / Naechste Schritte
 
@@ -62,22 +70,14 @@ herunter.
    physisch nicht wirklich an dieser USV (z.B. vorgeschaltete Steckerleiste
    pruefen), oder der Sensor der USV meldet fehlerhaft - vor Ort mit
    Verkabelung/ggf. Ersatzmessung zu klaeren.
-2. Proxmox-Client konfigurieren: [proxmox/SETUP.md](proxmox/SETUP.md).
-3. Windows-Clients konfigurieren (falls gewuenscht):
-   [windows/SETUP.md](windows/SETUP.md).
-4. End-to-End-Reachability-Test von Proxmox -> Pi:3493 (Pi-seitige
-   `ufw`-Regel steht bereits).
-5. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
+2. Kontrollierter Shutdown-Test **auf der Proxmox-Seite** (dort laeuft
    `upsmon` im `secondary`-Modus und trifft die Shutdown-Entscheidung -
-   der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
-   unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
-   Produktivsystem scharf schalten.
-6. ~~Alarmierung bei Netzausfall/kritischem Akkustand~~ **erledigt:**
-   periodischer Heartbeat + ereignisgetriebener Sofort-Push, beide bewusst
-   auf dem Pi selbst (keine Abhaengigkeit von Proxmox fuer die
-   Benachrichtigung) in denselben Uptime-Kuma-Monitor:
-   [monitoring/SETUP.md](monitoring/SETUP.md). Noch zu tun: End-to-End-Test
-   mit echtem `upsmon -c fsd`.
+   der Pi selbst hat bewusst keine eigene Shutdown-Logik) - per
+   `upsmon -c fsd` in einem unkritischen Zeitfenster vor Ort ausloesen und
+   in den Proxmox-Logs verifizieren, dass der Shutdown-Trigger korrekt
+   ankommt. Nicht ungetestet am Produktivsystem scharf schalten.
+3. Windows-Clients konfigurieren (optional, falls gewuenscht):
+   [windows/SETUP.md](windows/SETUP.md).
 
 ## Setup-Schritte (Referenz)
 
@@ -151,9 +151,10 @@ upsc apc2200@localhost
 ```
 
 Erst wenn hier reale Werte (Ladezustand, Status, Spannung) ankommen,
-`nut-server` (neu) starten - **`nut-monitor` bleibt bewusst dauerhaft
-masked**, siehe "Aktueller Stand" oben (der Pi soll nie selbst
-herunterfahren, das erledigt Proxmox):
+`nut-server` (neu) starten. Die Shutdown-Entscheidung selbst trifft
+ausschliesslich Proxmox (siehe `proxmox/SETUP.md`); ein lokales `upsmon`
+auf dem Pi wird nur fuer die Uptime-Kuma-Benachrichtigung genutzt, siehe
+`monitoring/SETUP.md`:
 
 ```bash
 sudo systemctl unmask nut-server

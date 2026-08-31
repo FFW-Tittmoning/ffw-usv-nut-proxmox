@@ -20,9 +20,9 @@ Zwei sich ergaenzende Signalwege in **denselben Kuma-Push-Monitor**:
    Netzausfall und kritischen Akkustand sofort, ohne auf den naechsten
    Cron-Takt zu warten.
 
-**Hinweis:** Diese Anleitung beschreibt den Stand, wie er an diesem
-Standort real deployed und verifiziert wurde. Die NUT-Doku-Fakten
-(`NOTIFYCMD`/`NOTIFYFLAG`-Syntax) sind gegen `upsmon.conf(5)` verifiziert.
+**Hinweis:** Diese Anleitung beschreibt den an diesem Standort
+eingesetzten Aufbau. Die NUT-Doku-Fakten (`NOTIFYCMD`/`NOTIFYFLAG`-Syntax)
+sind gegen `upsmon.conf(5)` verifiziert.
 
 ## Warum beide Signalwege noetig sind
 
@@ -59,7 +59,7 @@ Diese lokale Instanz aendert nichts an der uebergeordneten
 Architektur-Entscheidung "Pi faehrt niemals selbst herunter" - sie liefert
 lediglich Benachrichtigungs-Events, keine Shutdown-Aktionen.
 
-## Voraussetzung (bereits erledigt)
+## Voraussetzungen
 
 - Kuma-Push-Monitor fuer die USV angelegt, Push-URL bekannt:
   ```
@@ -189,28 +189,28 @@ Root-Dateisystem des Pi normalerweise read-only ist (siehe Haupt-Setup).
 
 ## Bekannte Einschraenkung: `LOWBATT` loest keine eigene Benachrichtigung aus
 
-**Real getestet und bestaetigt (2026-08-31):** Der Wechsel von `ONBATT`
-auf `LOWBATT` erzeugt **keine zusaetzliche** Kuma-Benachrichtigung, obwohl
-das Notify-Script bei beiden Events einen Push absetzt.
+Der Wechsel von `ONBATT` auf `LOWBATT` erzeugt **keine zusaetzliche**
+Kuma-Benachrichtigung, obwohl das Notify-Script bei beiden Events einen
+Push absetzt.
 
-**Ursache (verifiziert gegen Kuma-Doku/Quellcode):** Kuma markiert einen
-Heartbeat intern nur dann als benachrichtigungswuerdig ("important"), wenn
-sich der Monitor-**Status** (up/down) aendert. Der Push-API-Endpunkt
-(`/api/push/<token>`) kennt nur die Parameter `status`, `msg` und `ping` -
-keinen Weg, eine Benachrichtigung ohne echten Statuswechsel zu erzwingen.
-Da `ONBATT` den Monitor bereits auf `down` setzt, ist der nachfolgende
-`LOWBATT`-Push (ebenfalls `status=down`) aus Kumas Sicht keine Aenderung
-und loest nichts aus. Die Unterscheidung der `msg`-Texte zwischen `ONBATT`
-und `LOWBATT` im Script dient dadurch faktisch nur noch der Dokumentation/
-dem Log, nicht einer eigenstaendigen Alarmierung.
+**Ursache:** Kuma markiert einen Heartbeat intern nur dann als
+benachrichtigungswuerdig ("important"), wenn sich der Monitor-**Status**
+(up/down) aendert. Der Push-API-Endpunkt (`/api/push/<token>`) kennt nur
+die Parameter `status`, `msg` und `ping` - keinen Weg, eine
+Benachrichtigung ohne echten Statuswechsel zu erzwingen. Da `ONBATT` den
+Monitor bereits auf `down` setzt, ist der nachfolgende `LOWBATT`-Push
+(ebenfalls `status=down`) aus Kumas Sicht keine Aenderung und loest
+nichts aus. Die Unterscheidung der `msg`-Texte zwischen `ONBATT` und
+`LOWBATT` im Script dient dadurch nur der Dokumentation/dem Log, nicht
+einer eigenstaendigen Alarmierung.
 
-**Bewusst nicht behoben** (Entscheidung des Betreibers, 2026-08-31) - u.a.
-verworfene Optionen: ein zweiter Kuma-Monitor nur fuer `LOWBATT` (zu
-unuebersichtlich), ein direkter Zweitkanal ausserhalb von Kuma nur fuer
-diesen Fall, Kumas "Resend Notification if Down X times"-Einstellung
-(zeitbasiert, nicht event-spezifisch), sowie ein Fake-Transition-Trick
-(`down`→`up`→`down`, der zwischendurch eine irrefuehrende
-"Netz wieder da"-Meldung erzeugen wuerde).
+**Bewusst so akzeptiert**, u.a. verworfene Alternativen: ein zweiter
+Kuma-Monitor nur fuer `LOWBATT` (zu unuebersichtlich), ein direkter
+Zweitkanal ausserhalb von Kuma nur fuer diesen Fall, Kumas "Resend
+Notification if Down X times"-Einstellung (zeitbasiert, nicht
+event-spezifisch), sowie ein Fake-Transition-Trick (`down`→`up`→`down`,
+der zwischendurch eine irrefuehrende "Netz wieder da"-Meldung erzeugen
+wuerde).
 
 **Praktische Konsequenz fuer den Betrieb:** Die erste Benachrichtigung
 (`ONBATT`, "Netzausfall") kommt zuverlaessig sofort. Eine gesonderte

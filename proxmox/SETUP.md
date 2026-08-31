@@ -7,7 +7,7 @@ Shutdown-Entscheidung - er soll auch bei stark entladener Batterie einfach
 weiter Daten liefern, bis er hart die Spannung verliert (das schadet dank
 OverlayFS/Boot-Partition read-only nicht der SD-Karte).
 
-**Hinweis:** `nut-monitor` laeuft inzwischen auch auf dem Pi selbst - aber
+**Hinweis:** `nut-monitor` laeuft auch auf dem Pi selbst - aber
 nur fuer eine lokale, von Proxmox unabhaengige Kuma-Benachrichtigung
 (`SHUTDOWNCMD` dort auf `/bin/true` neutralisiert, Rolle `secondary`,
 siehe [monitoring/SETUP.md](../monitoring/SETUP.md)). Das aendert nichts an
@@ -31,12 +31,11 @@ Ausloesen durch reine Kalibrierungs-/Testzyklen der USV ausgeschlossen.
 Die `LB`-Schwelle wird **auf dem Pi** per Treiber-Override in
 `/etc/nut/ups.conf` gesetzt (`override.battery.charge.low`), NICHT auf
 Proxmox - das ist eine rein softwareseitige Einstellung im Treiberprozess,
-kein Schreibzugriff auf die USV-Hardware selbst. Aktuell auf diesem
-Standort auf **30%** gesetzt (Begruendung: Werks-Default der USV ist 10%,
-zu knapp fuer einen Host mit mehreren VMs - siehe "Wahl der Schwelle"
-unten).
+kein Schreibzugriff auf die USV-Hardware selbst. An diesem Standort auf
+**30%** gesetzt (Werks-Default der USV ist 10%, zu knapp fuer einen Host
+mit mehreren VMs - siehe "Wahl der Schwelle" unten).
 
-## Voraussetzung (bereits erledigt auf dem Pi)
+## Voraussetzungen (auf dem Pi)
 
 - `nut-server` auf dem Pi aktiv, `ups.conf` mit `override.battery.charge.low`
   auf den gewuenschten Wert gesetzt und verifiziert (`upsc <ups>@<PI_IP>`
@@ -136,9 +135,9 @@ Host-Halt.
 - Faktoren, die eine hoehere Schwelle nahelegen: viele/lang laufende VMs,
   hohe tatsaechliche Last am Ausgang, oder eine Batterie, deren reales
   Alter/Zustand nicht zweifelsfrei bekannt ist.
-- An diesem Standort: Batterien werden turnusmaessig alle 2 Jahre
-  getauscht, daher kein zusaetzlicher Sicherheitsaufschlag dafuer noetig -
-  30% wurde als ausreichender genereller Puffer gewaehlt.
+- An diesem Standort werden Batterien turnusmaessig alle 2 Jahre
+  getauscht, daher ist kein zusaetzlicher Sicherheitsaufschlag dafuer
+  noetig - 30% gilt als ausreichender genereller Puffer.
 
 ## Optional: Fruehwarnung ohne Shutdown
 
