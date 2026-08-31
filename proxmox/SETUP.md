@@ -2,11 +2,17 @@
 
 Generische Anleitung, unabhaengig vom konkreten Standort. Ziel: Proxmox
 liest die USV-Werte vom Pi (NUT-Server) und entscheidet **eigenstaendig**,
-wann es sich selbst herunterfaehrt. Der Pi selbst hat bewusst **keine**
-eigene Shutdown-Logik (`nut-monitor` bleibt dort dauerhaft masked) - er
-soll auch bei stark entladener Batterie einfach weiter Daten liefern, bis
-er hart die Spannung verliert (das schadet dank OverlayFS/Boot-Partition
-read-only nicht der SD-Karte).
+wann es sich selbst herunterfaehrt. Der Pi selbst trifft **keine**
+Shutdown-Entscheidung - er soll auch bei stark entladener Batterie einfach
+weiter Daten liefern, bis er hart die Spannung verliert (das schadet dank
+OverlayFS/Boot-Partition read-only nicht der SD-Karte).
+
+**Hinweis:** `nut-monitor` laeuft inzwischen auch auf dem Pi selbst - aber
+nur fuer eine lokale, von Proxmox unabhaengige Kuma-Benachrichtigung
+(`SHUTDOWNCMD` dort auf `/bin/true` neutralisiert, Rolle `secondary`,
+siehe [monitoring/SETUP.md](../monitoring/SETUP.md)). Das aendert nichts an
+der Architektur hier: Die tatsaechliche Shutdown-Entscheidung liegt
+weiterhin ausschliesslich bei Proxmox.
 
 ## Funktionsprinzip (kurz)
 
@@ -105,9 +111,10 @@ FAILURES"):
    sudo systemctl restart nut-server   # auf dem Pi
    ```
    Ausserdem pruefen, dass kein `POWERDOWNFLAG`-File (z.B. `/etc/killpower`)
-   auf dem primary-System zurueckgeblieben ist - bei uns nicht relevant,
-   da der Pi kein `upsmon` im primary-Modus faehrt und `POWERDOWNFLAG`
-   nirgends konfiguriert ist.
+   auf einem primary-System zurueckgeblieben ist - bei uns strukturell
+   nicht relevant, da kein `upsmon` an diesem Standort im primary-Modus
+   laeuft (weder Proxmox noch der Pi selbst - beide `secondary`) und
+   `POWERDOWNFLAG` nirgends konfiguriert ist.
 5. Erst wenn der Testlauf sauber durchlaeuft: `SHUTDOWNCMD` auf den echten
    Befehl umstellen und final in einem unkritischen Zeitfenster testen.
 

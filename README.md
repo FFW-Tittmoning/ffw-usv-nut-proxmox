@@ -19,15 +19,18 @@ herunter.
   gesetzt (Werks-Default der USV war 10%, fuer Server-/VM-Workloads zu
   knapp) - rein softwareseitiger Treiber-Override, kein Schreibzugriff
   auf die USV. Begruendung/Kriterien: [proxmox/SETUP.md](proxmox/SETUP.md).
-- **`nut-monitor`:** bleibt **dauerhaft masked** - bewusste
-  Architektur-Entscheidung: Der Pi soll niemals selbst herunterfahren
+- **`nut-monitor` auf dem Pi:** laeuft inzwischen (Rolle `secondary`,
+  `SHUTDOWNCMD` auf `/bin/true` neutralisiert) - aber **ausschliesslich**
+  fuer eine lokale Uptime-Kuma-Benachrichtigung
+  ([monitoring/SETUP.md](monitoring/SETUP.md)), NICHT fuer eine
+  Shutdown-Entscheidung. Der Pi faehrt weiterhin niemals selbst herunter
   (OverlayFS schuetzt die SD-Karte auch bei hartem Stromausfall) und
-  dadurch garantiert bis zuletzt Daten liefern. Die Shutdown-Entscheidung
-  liegt komplett bei Proxmox (dessen `upsmon` im `secondary`-Modus wertet
-  die Werte selbst aus).
-- **OverlayFS + Boot-Partition read-only:** Mechanismus aktiv, System
-  steht aktuell bewusst auf `rw` (fuer laufende Config-Arbeiten, noch
-  nicht wieder auf `ro` gesetzt). Jede Config-Aenderung braucht
+  liefert dadurch garantiert bis zuletzt Daten. Die tatsaechliche
+  Shutdown-Entscheidung liegt weiterhin komplett bei Proxmox (dessen
+  eigenes, unabhaengiges `upsmon` im `secondary`-Modus die Werte selbst
+  auswertet).
+- **OverlayFS + Boot-Partition read-only:** aktiv (Standardzustand). Jede
+  Config-Aenderung braucht
   `sudo /root/writable.sh rw` vorher und `sudo /root/writable.sh ro`
   danach, sobald abgeschlossen.
 - **Wartungs-Scripts auf dem Pi:** `/root/update.sh` (apt-Updates inkl.
@@ -69,9 +72,12 @@ herunter.
    der Pi selbst hat bewusst keine eigene Shutdown-Logik) in einem
    unkritischen Zeitfenster, mit Log-Verifikation - nicht ungetestet am
    Produktivsystem scharf schalten.
-6. Alarmierung bei Netzausfall/kritischem Akkustand ueber Uptime Kuma
-   einrichten (periodischer Heartbeat + ereignisgetriebener Sofort-Push
-   in denselben Monitor): [monitoring/SETUP.md](monitoring/SETUP.md).
+6. ~~Alarmierung bei Netzausfall/kritischem Akkustand~~ **erledigt:**
+   periodischer Heartbeat + ereignisgetriebener Sofort-Push, beide bewusst
+   auf dem Pi selbst (keine Abhaengigkeit von Proxmox fuer die
+   Benachrichtigung) in denselben Uptime-Kuma-Monitor:
+   [monitoring/SETUP.md](monitoring/SETUP.md). Noch zu tun: End-to-End-Test
+   mit echtem `upsmon -c fsd`.
 
 ## Setup-Schritte (Referenz)
 
